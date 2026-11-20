@@ -1,0 +1,109 @@
+<div class="admin">
+  <div class="head">
+    <div>
+      <h2>Panel docente y seguimiento 📊</h2>
+      <p>Mira cómo va cada estudiante, edita sus datos y administra los retos.</p>
+    </div>
+    <button pButton label="Exportar reporte (CSV)" icon="pi pi-download" class="p-button-success p-button-rounded" (click)="exportData()"></button>
+  </div>
+
+  <p *ngIf="message" class="flash ok" role="status">{{ message }}</p>
+  <p *ngIf="errorMessage" class="flash bad" role="alert">{{ errorMessage }}</p>
+
+  <!-- Estadísticas -->
+  <section class="stats" *ngIf="stats">
+    <div class="stat s1"><span>🧒</span><b>{{ stats.estudiantes }}</b><small>Estudiantes</small></div>
+    <div class="stat s2"><span>🔥</span><b>{{ stats.activos_hoy }}</b><small>Activos hoy</small></div>
+    <div class="stat s3"><span>📅</span><b>{{ stats.activos_semana }}</b><small>Activos esta semana</small></div>
+    <div class="stat s4"><span>⚡</span><b>{{ stats.promedio_xp }}</b><small>XP promedio</small></div>
+    <div class="stat s5"><span>🧠</span><b>{{ stats.partidas_memoria }}</b><small>Partidas de parejas</small></div>
+  </section>
+
+  <section class="pycods-card" *ngIf="stats?.retos?.length">
+    <h3>🎯 Retos completados</h3>
+    <div class="bar-row" *ngFor="let r of stats.retos">
+      <span class="bar-name">{{ r.titulo }}</span>
+      <div class="bar"><div class="fill" [style.width.%]="(r.completados / maxRetos()) * 100"></div></div>
+      <b>{{ r.completados }}</b>
+    </div>
+  </section>
+
+  <!-- Usuarios -->
+  <section class="pycods-card">
+    <h3>👥 Usuarios</h3>
+    <div class="grid-wrapper">
+      <ag-grid-angular class="ag-theme-alpine" [rowData]="rowData" [columnDefs]="columnDefs" [defaultColDef]="defaultColDef"
+        [pagination]="true" [paginationPageSize]="10" [animateRows]="false" (gridReady)="onGridReady($event)" (cellClicked)="onCellClicked($event)">
+      </ag-grid-angular>
+    </div>
+  </section>
+
+  <!-- Retos -->
+  <section class="pycods-card">
+    <div class="sec-head"><h3>📚 Retos</h3><button pButton label="Nuevo reto" icon="pi pi-plus" class="p-button-indigo p-button-rounded" (click)="newExercise()"></button></div>
+    <div class="table-wrap">
+      <table class="tbl">
+        <thead><tr><th>#</th><th>Título</th><th>XP</th><th>Nivel</th><th></th></tr></thead>
+        <tbody>
+          <tr *ngFor="let ex of exercises">
+            <td>{{ ex.id }}</td><td>{{ ex.titulo }}</td><td>{{ ex.xp_recompensa }}</td><td>{{ ex.nivel_requerido }}</td>
+            <td class="nowrap">
+              <button class="gbtn" title="Editar" aria-label="Editar reto" (click)="openExercise(ex)">✏️</button>
+              <button class="gbtn danger" title="Eliminar" aria-label="Eliminar reto" (click)="deleteExercise(ex)">🗑️</button>
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+    <p class="note">Las lecciones interactivas (preguntas, ordenar y escribir código) están disponibles para los 3 primeros retos. Los retos nuevos aparecen en el panel de cada niño.</p>
+  </section>
+</div>
+
+<!-- Diálogo: editar usuario -->
+<p-dialog header="Editar estudiante" [visible]="!!editUser" (visibleChange)="closeEdit($event)" [modal]="true" [style]="{ width: 'min(30rem, 95vw)' }">
+  <div class="form" *ngIf="editUser">
+    <label>Nombre<input pInputText [(ngModel)]="editUser.nombre"></label>
+    <label>Rol<p-dropdown [options]="roles" [(ngModel)]="editUser.rol" optionLabel="label" optionValue="value" [disabled]="!isAdmin" appendTo="body"></p-dropdown></label>
+    <div class="row3">
+      <label>Nivel<input pInputText type="number" min="1" [(ngModel)]="editUser.nivel"></label>
+      <label>XP<input pInputText type="number" min="0" [(ngModel)]="editUser.xp"></label>
+      <label>Monedas<input pInputText type="number" min="0" [(ngModel)]="editUser.monedas"></label>
+    </div>
+    <p class="note" *ngIf="!isAdmin">Solo un administrador puede cambiar el rol.</p>
+  </div>
+  <ng-template pTemplate="footer">
+    <button pButton label="Cancelar" class="p-button-text" (click)="closeEdit(false)"></button>
+    <button pButton label="Guardar" icon="pi pi-check" class="p-button-success" (click)="saveUser()"></button>
+  </ng-template>
+</p-dialog>
+
+<!-- Diálogo: avance de un estudiante -->
+<p-dialog [header]="detail ? 'Avance de ' + detail.nombre : ''" [visible]="!!detail" (visibleChange)="closeDetail($event)" [modal]="true" [style]="{ width: 'min(32rem, 95vw)' }">
+  <div class="detail" *ngIf="detail">
+    <div class="chips"><span>🏆 Nivel {{ detail.nivel }}</span><span>⚡ {{ detail.xp }} XP</span><span>🪙 {{ detail.monedas }}</span><span>🔥 Racha {{ detail.racha }}</span></div>
+    <p class="note">Última actividad: {{ detail.ultima_actividad || 'todavía no ha practicado' }} · Partidas de parejas: {{ detail.partidas_memoria }}</p>
+    <h4>Retos</h4>
+    <ul><li *ngFor="let r of detail.retos">{{ r.completado ? '✅' : '⬜' }} {{ r.titulo }}</li></ul>
+    <h4>Logros</h4>
+    <p *ngIf="!detail.logros.length" class="note">Aún no tiene logros.</p>
+    <p *ngIf="detail.logros.length">{{ detail.logros.join(' · ') }}</p>
+  </div>
+</p-dialog>
+
+<!-- Diálogo: crear / editar reto -->
+<p-dialog [header]="editExercise?.id ? 'Editar reto' : 'Nuevo reto'" [visible]="!!editExercise" (visibleChange)="closeExercise($event)" [modal]="true" [style]="{ width: 'min(34rem, 95vw)' }">
+  <div class="form" *ngIf="editExercise">
+    <label>Título<input pInputText [(ngModel)]="editExercise.titulo"></label>
+    <label>Descripción<textarea pInputText rows="2" [(ngModel)]="editExercise.descripcion"></textarea></label>
+    <label>Código de ejemplo<textarea pInputText rows="3" class="mono" [(ngModel)]="editExercise.ejemplo_codigo"></textarea></label>
+    <label>Respuesta esperada<input pInputText [(ngModel)]="editExercise.respuesta_correcta"></label>
+    <div class="row3">
+      <label>XP de recompensa<input pInputText type="number" min="0" [(ngModel)]="editExercise.xp_recompensa"></label>
+      <label>Nivel requerido<input pInputText type="number" min="1" [(ngModel)]="editExercise.nivel_requerido"></label>
+    </div>
+  </div>
+  <ng-template pTemplate="footer">
+    <button pButton label="Cancelar" class="p-button-text" (click)="closeExercise(false)"></button>
+    <button pButton label="Guardar" icon="pi pi-check" class="p-button-success" [disabled]="!editExercise?.titulo || !editExercise?.descripcion || !editExercise?.respuesta_correcta" (click)="saveExercise()"></button>
+  </ng-template>
+</p-dialog>

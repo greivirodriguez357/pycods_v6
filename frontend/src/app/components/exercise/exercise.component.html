@@ -1,0 +1,95 @@
+<div class="lesson">
+  <div class="lesson-top">
+    <button pButton label="Volver" icon="pi pi-arrow-left" class="p-button-text p-button-rounded" routerLink="/dashboard"></button>
+    <h2 *ngIf="lesson">{{ lesson.titulo }}</h2>
+  </div>
+
+  <p *ngIf="error" class="pycods-card err" role="alert">{{ error }}</p>
+
+  <ng-container *ngIf="lesson && !result">
+    <div class="progress-row">
+      <app-mascot [size]="84" [mood]="step.tipo === 'aprender' ? 'happy' : 'think'"></app-mascot>
+      <div class="dots"><span *ngFor="let p of lesson.pasos; let k = index" [class.done]="k < i" [class.now]="k === i"></span></div>
+    </div>
+    <p class="count">Paso {{ i + 1 }} de {{ lesson.pasos.length }}</p>
+
+    <section class="pycods-card step" [ngSwitch]="step.tipo">
+      <!-- APRENDER -->
+      <ng-container *ngSwitchCase="'aprender'">
+        <p class="big">{{ step.texto }}</p>
+        <pre class="code" *ngIf="step.codigo">{{ step.codigo }}</pre>
+        <div class="actions">
+          <button pButton label="🔊 Escuchar" class="p-button-outlined" (click)="speak(step.texto)"></button>
+          <button pButton label="¡Entendido! ✅" class="p-button-success" (click)="next()"></button>
+        </div>
+      </ng-container>
+
+      <!-- OPCIÓN MÚLTIPLE -->
+      <ng-container *ngSwitchCase="'opcion'">
+        <p class="big strong">{{ step.pregunta }}</p>
+        <pre class="code" *ngIf="step.codigo">{{ step.codigo }}</pre>
+        <div class="options">
+          <button *ngFor="let idx of optionOrder" type="button" class="opt"
+                  [class.right]="ok && idx === step.correcta" [class.nope]="wrong.includes(idx)"
+                  [disabled]="wrong.includes(idx) || (ok && idx !== step.correcta)" (click)="pick(idx)">{{ step.opciones[idx] }}</button>
+        </div>
+        <p *ngIf="wrong.length && !ok" class="soft">🙂 ¡Casi! Inténtalo otra vez, tú puedes.</p>
+        <p *ngIf="wrong.length >= 2 && !ok && step.pista" class="hint">💡 Pista: {{ step.pista }}</p>
+        <div *ngIf="ok" class="win" role="status"><b>¡Muy bien! 🎉</b>
+          <button pButton [label]="isLast ? 'Terminar 🏁' : 'Siguiente ➡️'" class="p-button-success" (click)="next()"></button></div>
+      </ng-container>
+
+      <!-- ORDENAR -->
+      <ng-container *ngSwitchCase="'ordenar'">
+        <p class="big strong">{{ step.instruccion }}</p>
+        <p class="label">Tu código (en orden):</p>
+        <div class="slot" aria-live="polite">
+          <span *ngIf="!chosen.length" class="placeholder">Toca los bloques de abajo para armarlo 👇</span>
+          <button *ngFor="let id of chosen" type="button" class="blk dark" (click)="remove(id)">{{ step.bloques[id] }}</button>
+        </div>
+        <p class="label">Bloques:</p>
+        <div class="bank"><button *ngFor="let id of bank" type="button" class="blk" (click)="add(id)">{{ step.bloques[id] }}</button></div>
+        <p *ngIf="msg" class="soft">{{ msg }}</p>
+        <div class="actions">
+          <button *ngIf="!ok" pButton label="Comprobar ✅" class="p-button-success" [disabled]="chosen.length !== step.bloques.length" (click)="checkOrder()"></button>
+          <div *ngIf="ok" class="win" role="status"><b>¡Código perfecto! 🎉</b>
+            <button pButton [label]="isLast ? 'Terminar 🏁' : 'Siguiente ➡️'" class="p-button-success" (click)="next()"></button></div>
+        </div>
+      </ng-container>
+
+      <!-- ESCRIBIR CÓDIGO -->
+      <ng-container *ngSwitchCase="'codigo'">
+        <p class="big strong">{{ step.instruccion }}</p>
+        <textarea class="editor" rows="6" spellcheck="false" autocapitalize="off" autocomplete="off" aria-label="Escribe tu código aquí"
+                  [(ngModel)]="code" (keydown.tab)="insertTab($event)" [readOnly]="ok"></textarea>
+        <div class="actions">
+          <button pButton label="Ejecutar ▶️" class="p-button-indigo" [loading]="running" [disabled]="ok" (click)="runCode()"></button>
+          <button pButton label="Volver a empezar" class="p-button-text" [disabled]="ok" (click)="code = step.inicial; codeOut = ''; codeErr = ''"></button>
+        </div>
+        <div class="console" *ngIf="codeOut || codeErr || ok" aria-live="polite">
+          <p class="label light">Esto mostró tu programa:</p>
+          <pre class="out">{{ codeOut || '(nada todavía)' }}</pre>
+        </div>
+        <p *ngIf="codeErr" class="soft err-msg">🙂 {{ codeErr }}</p>
+        <p *ngIf="!ok && step.pista" class="hint">💡 Pista: {{ step.pista }}</p>
+        <div *ngIf="ok" class="win" role="status"><b>¡Tu código funcionó! 🎉</b>
+          <button pButton [label]="isLast ? 'Terminar 🏁' : 'Siguiente ➡️'" class="p-button-success" (click)="next()"></button></div>
+      </ng-container>
+    </section>
+    <p *ngIf="saving" class="count">Guardando tu avance…</p>
+  </ng-container>
+
+  <!-- RESULTADO -->
+  <section *ngIf="result" class="pycods-card result" role="status" aria-live="polite">
+    <app-mascot [size]="150" mood="cheer"></app-mascot>
+    <h2>¡Reto completado!</h2>
+    <div class="stars" aria-hidden="true">⭐ ⭐ ⭐</div>
+    <p class="big" *ngIf="result.xp_ganado > 0">Ganaste <b>+{{ result.xp_ganado }} XP</b> y <b>+5 🪙</b></p>
+    <p class="big" *ngIf="result.xp_ganado === 0">¡Ya lo habías completado! Qué bueno repasar.</p>
+    <div class="logro" *ngFor="let l of result.logros_nuevos">{{ l.icono }} ¡Nuevo logro: <b>{{ l.nombre }}</b>! <small>{{ l.descripcion }} (+{{ l.xp }} XP)</small></div>
+    <div class="actions center">
+      <a pButton routerLink="/dashboard" label="Volver al inicio 🏠" class="p-button-indigo no-underline"></a>
+      <a pButton routerLink="/juegos/memoria" label="Jugar parejas 🧠" class="p-button-help no-underline"></a>
+    </div>
+  </section>
+</div>
